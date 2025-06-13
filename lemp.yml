@@ -1,0 +1,65 @@
+---
+- name: Install LEMP stack on LEMP VM
+  hosts: lemp_group
+  become: yes
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install Nginx, PHP 8.3 FPM, MySQL Server, and PHP MySQL extension
+      apt:
+        name:
+          - nginx
+          - php8.3-fpm
+          - php8.3-mysql
+          - mysql-server
+        state: present
+
+    - name: Install required Python MySQL module for Ansible
+      apt:
+        name: python3-pymysql
+        state: present
+        update_cache: yes
+
+    - name: Ensure MySQL is running and enabled
+      service:
+        name: mysql
+        state: started
+        enabled: true
+
+    - name: Remove default PHP info page (if exists)
+      file:
+        path: /var/www/html/info.php
+        state: absent
+
+    - name: Copy index.php to web root
+      copy:
+        src: index.php     # Make sure this file is in the same directory as this playbook
+        dest: /var/www/html/index.php
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
+    - name: Configure Nginx to process PHP files
+      copy:
+        src: nginx_default.conf
+        dest: /etc/nginx/sites-available/default
+        owner: root
+        group: root
+        mode: '0644'
+      notify:
+        - Restart nginx
+        - Restart php-fpm
+
+  handlers:
+    - name: Restart nginx
+      systemd:
+        name: nginx
+        state: restarted
+
+    - name: Restart php-fpm
+      systemd:
+        name: php8.3-fpm
+        state: restarted

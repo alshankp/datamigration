@@ -1,0 +1,61 @@
+---
+# STEP 1: Export and transfer Magento DB from Docker container to LEMP VM
+- name: Export Magento DB from local Docker and transfer to LEMP VM
+  hosts: localhost
+  become: false
+  tasks:
+    - name: Run script to export Magento DB and transfer to VM
+      script: export_magento_db.sh
+
+# STEP 2: Import DB inside the LEMP VM
+- name: Import Magento DB into MySQL on LEMP VM
+  hosts: lemp_group
+  become: yes
+  vars:
+    db_name: magento
+    db_user: magento_user
+    db_password: secretpass
+    decompress_path: /home/ubuntu/work/ansible/lemp_poc/db_backup.sql
+    dump_path: /home/ubuntu/work/ansible/lemp_poc/db_backup.sql
+
+    mysql_socket: /var/run/mysqld/mysqld.sock
+
+  tasks:
+    - name: Ensure MySQL is running
+      service:
+        name: mysql
+        state: started
+        enabled: true
+
+    - name: Install PyMySQL via apt (safe for Ubuntu 24.04+)
+      apt:
+        name: python3-pymysql
+        state: present
+        update_cache: yes
+
+    - name: Decompress SQL dump inside VM
+      command: gunzip -f "{{ decompress_path }}"
+      args:
+        creates: "{{ dump_path }}"
+
+    - name: Create database for Magento
+      mysql_db:
+        name: "{{ db_name }}"
+        state: present
+        login_unix_socket: "{{ mysql_socket }}"
+
+    - name: Import SQL dump into new DB
+      mysql_db:
+        name: "{{ db_name }}"
+        state: import
+        target: "{{ dump_path }}"
+        login_unix_socket: "{{ mysql_socket }}"
+
+    - name: Create MySQL user and grant privileges
+      mysql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        priv: "{{ db_name }}.*:ALL"
+        state: present
+        login_unix_socket: "{{ mysql_socket }}"
+

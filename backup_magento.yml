@@ -1,0 +1,39 @@
+---
+# STEP 1: Dump DB and compress it inside VM
+- name: Backup Magento DB from LEMP VM
+  hosts: lemp_group
+  become: yes
+  vars:
+    db_name: magento_warden
+    backup_path: /tmp/magento_warden.sql
+    backup_archive: /tmp/magento_warden.sql.gz
+
+  tasks:
+    - name: Ensure MySQL is running
+      service:
+        name: mysql
+        state: started
+
+    - name: Install PyMySQL if not present
+      apt:
+        name: python3-pymysql
+        state: present
+        update_cache: yes
+
+    - name: Dump the Magento DB
+      shell: mysqldump -u root {{ db_name }} > {{ backup_path }}
+      args:
+        executable: /bin/bash
+
+    - name: Compress the dump
+      shell: gzip -f {{ backup_path }}
+      args:
+        creates: "{{ backup_archive }}"
+
+# STEP 2: Transfer backup to local
+- name: Transfer backup from VM to localhost
+  hosts: localhost
+  become: false
+  tasks:
+    - name: Run script to fetch backup from VM
+      script: fetch_backup_from_vm.sh
