@@ -4,7 +4,7 @@
   hosts: lemp_group
   become: yes
   vars:
-    db_name: magento_warden
+    db_name: magento
     backup_path: /tmp/magento_warden.sql
     backup_archive: /tmp/magento_warden.sql.gz
 
